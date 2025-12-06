@@ -1,0 +1,28 @@
+{
+    "name": "C++ OpenGL Dev",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    // コンテナ起動時に渡す引数
+    // --net=host: ネットワークをホストと共有（Xサーバー通信用）
+    // DISPLAY環境変数: グラフィック出力先を指定
+    "runArgs": [
+        "--net=host", 
+        "-e", "DISPLAY=${env:DISPLAY}", 
+        "--mount", "type=bind,source=/tmp/.X11-unix,target=/tmp/.X11-unix"
+    ],
+    
+    // VSCode拡張機能の自動インストール
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools",
+                "twxs.cmake"
+            ]
+        }
+    },
+    
+    // 権限設定（管理者権限でないと動かない場合があるため）
+    "remoteUser": "vscode"
+}
