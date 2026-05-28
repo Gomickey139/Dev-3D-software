@@ -1,1 +1,17 @@
-build/*
+# --- ビルド関連のディレクトリ ---
+/build/
+/bin/
+
+# --- C/C++のコンパイル一時ファイル ---
+*.o
+*.obj
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+
+# --- エディタやOSの自動生成ファイル ---
+.vscode/
+.DS_Store
+Thumbs.db
