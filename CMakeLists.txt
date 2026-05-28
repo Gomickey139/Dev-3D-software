@@ -5,8 +5,12 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # 実行ファイル名
 add_executable(My3DApp src/main.cpp)
+
+set(OpenGL_GL_PREFERENCE GLVND)
 
 # ライブラリの検索
 find_package(glfw3 REQUIRED)
