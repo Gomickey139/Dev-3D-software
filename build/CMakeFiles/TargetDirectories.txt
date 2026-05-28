@@ -1,3 +1,0 @@
-/workspaces/Dev-3D-software/build/CMakeFiles/My3DApp.dir
-/workspaces/Dev-3D-software/build/CMakeFiles/edit_cache.dir
-/workspaces/Dev-3D-software/build/CMakeFiles/rebuild_cache.dir
