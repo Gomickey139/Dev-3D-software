@@ -7,22 +7,34 @@
     // --net=host: ネットワークをホストと共有（Xサーバー通信用）
     // DISPLAY環境変数: グラフィック出力先を指定
     "runArgs": [
-        "--net=host", 
-        "-e", "DISPLAY=${env:DISPLAY}", 
-        "--mount", "type=bind,source=/tmp/.X11-unix,target=/tmp/.X11-unix"
+        "--gpus=all",
+        "--device=/dev/dxg",
+        "--net=host",
+        "-e",
+        "DISPLAY=${env:DISPLAY}",
+        "--mount",
+        "type=bind,source=/tmp/.X11-unix,target=/tmp/.X11-unix"
     ],
-    
+    "mounts": [
+        "source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind,readonly"
+    ],
+    "containerEnv": {
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "graphics,display,video,utility,compute",
+        "LD_LIBRARY_PATH": "/usr/lib/wsl/lib",
+        "MESA_D3D12_DEFAULT_ADAPTER_NAME": "NVIDIA"
+    },
     // VSCode拡張機能の自動インストール
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-vscode.cpptools",
                 "ms-vscode.cmake-tools",
-                "twxs.cmake"
+                "twxs.cmake",
+                "slevesque.shader"
             ]
         }
     },
-    
     // 権限設定（管理者権限でないと動かない場合があるため）
     "remoteUser": "vscode"
 }

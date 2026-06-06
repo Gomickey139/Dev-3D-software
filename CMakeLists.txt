@@ -8,7 +8,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # 実行ファイル名
-add_executable(My3DApp src/main.cpp)
+add_executable(My3DApp src/main.cpp src/gameObject.cpp src/mesh.cpp src/shader.cpp src/input.cpp src/player.cpp)
+
+target_include_directories(My3DApp PRIVATE include)
 
 set(OpenGL_GL_PREFERENCE GLVND)
 
