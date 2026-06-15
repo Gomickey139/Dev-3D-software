@@ -47,6 +47,8 @@ bool Application::Initialize(int width, int height, const std::string &title)
     int monitorCount;
     GLFWmonitor **monitors = glfwGetMonitors(&monitorCount);
 
+    std::cout << "モニターの個数：" << monitorCount << std::endl;
+
     if (monitorCount > 1)
     {
         int xpos, ypos;
