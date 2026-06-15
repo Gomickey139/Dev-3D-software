@@ -43,8 +43,8 @@ Mesh::~Mesh()
 
 Mesh *ObjLoader::Load(const char *path)
 {
-    std::vector<Vec3> temp_positions;
-    std::vector<Vec3> temp_normals;
+    std::vector<glm::vec3> temp_positions;
+    std::vector<glm::vec3> temp_normals;
     std::vector<Vertex> out_vertices;
 
     std::ifstream file(path);
@@ -63,13 +63,13 @@ Mesh *ObjLoader::Load(const char *path)
 
         if (type == "v")
         {
-            Vec3 p;
+            glm::vec3 p;
             ss >> p.x >> p.y >> p.z;
             temp_positions.push_back(p);
         }
         else if (type == "vn")
         {
-            Vec3 n;
+            glm::vec3 n;
             ss >> n.x >> n.y >> n.z;
             temp_normals.push_back(n);
         }
@@ -113,4 +113,98 @@ Mesh *ObjLoader::Load(const char *path)
     std::cout << "モデル読み込み成功(" << path << "): 頂点数 = " << out_vertices.size() << std::endl;
 
     return new Mesh(out_vertices);
+}
+
+std::map<std::string, std::unique_ptr<Mesh>> ObjLoader::LoadMulti(const std::string &path)
+{
+    std::map<std::string, std::unique_ptr<Mesh>> result;
+
+    std::vector<glm::vec3> temp_positions;
+    std::vector<glm::vec3> temp_normals;
+
+    std::vector<Vertex> currentVertices;
+    std::string currentPartName = "DefaultPart";
+
+    std::ifstream file(path);
+    if (!file.is_open())
+    {
+        std::cerr << "エラー: OBJファイルが開けません: " << path << std::endl;
+        return result;
+    }
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        std::istringstream ss(line);
+        std::string type;
+        ss >> type;
+
+        if (type == "o" || type == "g")
+        {
+            if (!currentVertices.empty())
+            {
+                result[currentPartName] = std::make_unique<Mesh>(currentVertices);
+
+                currentVertices.clear();
+            }
+
+            ss >> currentPartName;
+        }
+        else if (type == "v")
+        {
+            glm::vec3 p;
+            ss >> p.x >> p.y >> p.z;
+            temp_positions.push_back(p);
+        }
+        else if (type == "vn")
+        {
+            glm::vec3 n;
+            ss >> n.x >> n.y >> n.z;
+            temp_normals.push_back(n);
+        }
+        else if (type == "f")
+        {
+            std::string vStr;
+            std::vector<std::string> faceVertices;
+
+            auto parseFaceVertex = [&](const std::string &vStr)
+            {
+                int pIdx = 0, tIdx = 0, nIdx = 0;
+                if (vStr.find("//") != std::string::npos)
+                {
+                    sscanf(vStr.c_str(), "%d//%d", &pIdx, &nIdx);
+                }
+                else
+                {
+                    sscanf(vStr.c_str(), "%d/%d/%d", &pIdx, &tIdx, &nIdx);
+                }
+
+                Vertex vertex;
+                vertex.position = temp_positions[pIdx - 1];
+                vertex.normal = temp_normals[nIdx - 1];
+                currentVertices.push_back(vertex);
+            };
+
+            while (ss >> vStr)
+            {
+                faceVertices.push_back(vStr);
+            }
+
+            for (size_t i = 1; i < faceVertices.size() - 1; ++i)
+            {
+                parseFaceVertex(faceVertices[0]);
+                parseFaceVertex(faceVertices[i]);
+                parseFaceVertex(faceVertices[i + 1]);
+            }
+        }
+    }
+
+    if (!currentVertices.empty())
+    {
+        result[currentPartName] = std::make_unique<Mesh>(currentVertices);
+    }
+
+    std::cout << "モデル読み込み成功(" << path << ")" << std::endl;
+
+    return result;
 }

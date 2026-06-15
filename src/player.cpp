@@ -3,10 +3,11 @@
 
 Player::Player(Mesh *m, Shader *s) : GameObject(m, s)
 {
-    transform.position = glm::vec3(0.0f, 0.0f, 0.0f);
+    transform.position = glm::vec3(0.0f, -2.0f, 0.0f);
     transform.scale = glm::vec3(0.1f);
     velocity.x = 0.0f;
     velocity.y = 0.0f;
+    HP = 100.0f;
 }
 
 void Player::MoveEvent(float deltaTime)
@@ -42,9 +43,31 @@ void Player::MoveEvent(float deltaTime)
     }
 }
 
+void Player::FireEvent(float deltaTime)
+{
+
+    bool isFiring = Input::GetKey(GLFW_KEY_P);
+
+    glm::vec3 localOffset1 = glm::vec3(-3.0f, -0.5f, 2.0f);
+    glm::vec3 localOffset2 = glm::vec3(3.0f, -0.5f, 2.0f);
+
+    glm::vec3 dir = glm::vec3(0.0f, 0.0f, -1.0f);
+
+    glm::mat4 worldMatrix = GetWorldMatrix();
+
+    glm::vec3 spawnPos1 = glm::vec3(worldMatrix * glm::vec4(localOffset1, 1.0f));
+    glm::vec3 spawnPos2 = glm::vec3(worldMatrix * glm::vec4(localOffset2, 1.0f));
+
+    glm::vec3 forwardDir = glm::normalize(dir + glm::vec3(velocity, 0.0f) * 0.02f);
+
+    // 連射と更新を一括で処理
+    m_weapons[0]->UpdateAndFire(deltaTime, isFiring, {spawnPos1, spawnPos2}, forwardDir);
+}
+
 void Player::InputEvent(float deltaTime)
 {
     MoveEvent(deltaTime);
+    FireEvent(deltaTime);
 
     if (Input::GetKeyDown(GLFW_KEY_SPACE) && !isRolling) // 無敵
     {
@@ -115,4 +138,22 @@ void Player::Update(float deltaTime)
     transform.position.y += velocity.y * deltaTime;
     transform.position.x = glm::clamp(transform.position.x, minX, maxX);
     transform.position.y = glm::clamp(transform.position.y, minY, maxY);
+
+    GameObject::Update(deltaTime);
+}
+
+void Player::Draw(const glm::mat4 &view, const glm::mat4 &projection)
+{
+    GameObject::Draw(view, projection);
+
+    // すべての武器（の弾）を描画する
+    for (auto &w : m_weapons)
+    {
+        w->Draw(view, projection);
+    }
+}
+
+void Player::AddWeapon(std::unique_ptr<Weapon> weapon)
+{
+    m_weapons.push_back(std::move(weapon));
 }
