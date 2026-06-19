@@ -110,6 +110,8 @@ void Application::LoadAssets()
     m_shaders["background"] = std::make_unique<Shader>("../assets/shaders/background/background.vert", "../assets/shaders/background/background.frag");
     m_shaders["thinking_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/face.frag");
     m_shaders["thinking_eyebrows"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/eyebrows.frag");
+    // m_shaders["angry_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/angry/face.frag");
+    // m_shaders["angry_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/angry/eyebrows.frag");
     m_shaders["shot"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/weapon/shot.frag");
     m_shaders["fire"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/jet/fire.frag");
     m_shaders["fade"] = std::make_unique<Shader>("../assets/shaders/postEffect/fade.vert", "../assets/shaders/postEffect/fade.frag");
@@ -136,6 +138,10 @@ void Application::LoadAssets()
     auto enemyModel = CreateModel("../assets/models/thinking.obj", m_shaders["thinking_face"].get(), {{"Eyebrows", m_shaders["thinking_eyebrows"].get()}});
     enemy->AddChild(std::move(enemyModel));
     m_enemyRef = enemy.get();
+
+    m_meshes.push_back(std::unique_ptr<Mesh>(ObjLoader::Load("../assets/models/angry.obj")));
+    // Mesh *angryMeshPtr = m_meshes.back().get();
+    // auto enemyShot = std::make_unique<StraightShotPool>("EnemyShot", 100,angryMeshPtr, m_shaders[""])
     m_gameObjects.push_back(std::move(enemy));
 }
 
@@ -342,7 +348,7 @@ void Application::Render()
         glDisable(GL_DEPTH_TEST);
 
         // 3. タイマーから透明度を計算（例：2.0秒かけて 0.0 → 1.0 にする）
-        float alpha = glm::clamp(m_clearFadeTimer / 2.0f, 0.0f, 1.0f);
+        float alpha = glm::clamp(m_clearFadeTimer / 5.0f, 0.0f, 1.0f);
 
         m_shaders["fade"]->use();
         m_shaders["fade"]->setFloat("uAlpha", alpha);
