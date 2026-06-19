@@ -6,6 +6,7 @@ in vec3 localPos;
 
 // main.cppのループ内で送っている時間
 uniform float uTime;
+uniform float uEndFlash;
 
 //光源と方向を定義
 vec3 lightDir = normalize(vec3(0.5, 1.0, 1.0));
@@ -68,7 +69,7 @@ void main() {
     float t = 0.0;     // レイが進んだ総距離
     float d = 0.0;     // オブジェクトまでの最短距離
 
-    for(int i = 0; i < 64; i++) {
+    for(int i = 0; i < 128; i++) {
         vec3 p = ro + rd * t; // 現在のレイの先端位置
         d = map(p);           // そこから一番近い物体までの距離を測る
 
@@ -101,12 +102,14 @@ void main() {
         float lighting = diff + ambient;
 
         // ⑥ 基本の色（サイバーな水色）に光の強さを掛ける
-        vec3 baseColor = vec3(0.49, 0.46, 1.0);
+        vec3 baseColor = vec3(0.36, 0.35, 0.82);
         col = baseColor * lighting;
 
         float fog = 1.0 * (1.0 + t * t * 0.0005);
         col *= fog;
     }
 
-    FragColor = vec4(col, 1.0);
+    vec4 flash = vec4(1.0);
+
+    FragColor = mix(vec4(col, 1.0), flash, uEndFlash);
 }

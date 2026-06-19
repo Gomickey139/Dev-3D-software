@@ -1,11 +1,10 @@
 # --- ビルド関連のディレクトリ ---
 /build/
-/bin/
+/build_win/
 
 # --- C/C++のコンパイル一時ファイル ---
 *.o
 *.out
-*.exe
 *.dll
 *.so
 *.dylib

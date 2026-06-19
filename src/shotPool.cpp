@@ -1,19 +1,23 @@
 #include "shotPool.h"
 
-ShotPool::ShotPool(int maxShots, Mesh *mesh, Shader *shader, float fireRate) : m_sharedMesh(mesh), m_sharedShader(shader), m_fireRate(fireRate)
+ShotPool::ShotPool(std::string name, int maxShots, Mesh *mesh, Shader *shader, float fireRate, float speed, float lifeTime, float collisionRadius, glm::vec3 scale)
+    : m_name(name), m_sharedMesh(mesh), m_sharedShader(shader), m_fireRate(fireRate), m_shotSpeed(speed), m_shotLifeTime(lifeTime), m_collisionRadius(collisionRadius), m_shotScale(scale)
 {
     m_shots.resize(maxShots);
 }
-
-void ShotPool::UpdateAndFire(float deltaTime, bool isFireButtonPressed, std::array<glm::vec3, 2> spawnPos, glm::vec3 direction)
+void ShotPool::UpdateAndFire(float deltaTime, bool isFireButtonPressed, const std::vector<glm::vec3> spawnPos, glm::vec3 direction)
 {
     m_fireTimer -= deltaTime;
     if (isFireButtonPressed && m_fireTimer <= 0.0f)
     {
-        Fire(spawnPos[0], direction);
-        Fire(spawnPos[1], direction);
+        for (const auto &pos : spawnPos)
+        {
+            Fire(pos, direction);
+        }
         m_fireTimer = m_fireRate;
     }
+
+    UpdateMovement(deltaTime);
 
     for (auto &s : m_shots)
     {
@@ -21,7 +25,7 @@ void ShotPool::UpdateAndFire(float deltaTime, bool isFireButtonPressed, std::arr
         {
             continue;
         }
-        s.position += s.velocity * deltaTime;
+
         s.lifeTime -= deltaTime;
 
         if (s.lifeTime <= 0.0f)
@@ -50,7 +54,7 @@ void ShotPool::Draw(const glm::mat4 &view, const glm::mat4 &projection)
         }
 
         glm::mat4 model = glm::translate(glm::mat4(1.0f), s.position);
-        model = glm::scale(model, glm::vec3(0.5f));
+        model = glm::scale(model, m_shotScale);
 
         m_sharedShader->setMat4("model", model);
         m_sharedMesh->Draw();
@@ -64,10 +68,18 @@ void ShotPool::Fire(glm::vec3 pos, glm::vec3 dir)
         if (!s.isActive)
         {
             s.position = pos;
-            s.velocity = dir * 70.0f;
-            s.lifeTime = 2.0f;
+            s.velocity = dir * m_shotSpeed; // 70.0
+            s.lifeTime = m_shotLifeTime;    // 2.0
             s.isActive = true;
             return;
         }
+    }
+}
+
+void ShotPool::Collision(std::string name, Shot &s)
+{
+    if (name == "Enemy")
+    {
+        s.isActive = false;
     }
 }

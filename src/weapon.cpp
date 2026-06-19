@@ -1,14 +1,11 @@
 #include "weapon.h"
 
-Weapon::Weapon(Mesh *shotMesh, Shader *shotShader, float fireRate, int maxShots)
+Weapon::Weapon(std::unique_ptr<ShotPool> pool)
 {
-    m_pool = std::make_unique<ShotPool>(maxShots, shotMesh, shotShader, fireRate);
+    m_pool = std::move(pool);
 }
 
-void Weapon::UpdateAndFire(float deltaTime, bool isFiring, glm::vec3 pos, glm::vec3 dir)
-{
-}
-void Weapon::UpdateAndFire(float deltaTime, bool isFiring, std::array<glm::vec3, 2> pos, glm::vec3 dir)
+void Weapon::UpdateAndFire(float deltaTime, bool isFiring, const std::vector<glm::vec3> &pos, glm::vec3 dir)
 {
     m_pool->UpdateAndFire(deltaTime, isFiring, pos, dir);
 }

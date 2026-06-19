@@ -1,4 +1,4 @@
-#define GL_GLEXT_PROTOTYPES
+#include <glad/glad.h>
 
 #include <GLFW/glfw3.h>
 

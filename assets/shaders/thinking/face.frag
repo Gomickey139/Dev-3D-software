@@ -4,6 +4,9 @@ out vec4 FragColor;
 in vec3 localPos;
 in vec3 Normal;
 
+uniform float uHitFlash;
+uniform float uDeathDark;
+
 vec3 lightDir = normalize(vec3(0.25, 0.25, 1.0));
 
 void main() {
@@ -32,4 +35,9 @@ void main() {
     vec3 subColor = vec3(0.0);
 
     FragColor = mix(vec4(subColor, 1.0), vec4(baseColor, 1.0), lighting);
+
+    vec4 flashColor = mix(FragColor, vec4(1.0), 0.5);
+
+    FragColor = mix(FragColor, flashColor, uHitFlash);
+    FragColor = mix(FragColor, vec4(0.0), uDeathDark);
 }

@@ -9,6 +9,7 @@
 
 #include "mesh.h"
 #include "shader.h"
+#include "collider.h"
 
 struct Transform
 {
@@ -30,6 +31,8 @@ public:
     GameObject *parent = nullptr;
     std::vector<std::unique_ptr<GameObject>> children;
 
+    std::unique_ptr<Collider> collider;
+
     GameObject(Mesh *mesh, Shader *shader, const std::string &name = "GameObject");
     virtual ~GameObject() = default;
 
@@ -43,5 +46,11 @@ public:
 
     virtual void Draw(const glm::mat4 &view, const glm::mat4 &projection);
 
+    virtual void Collision(std::string name) {}
+
+    /**その名前の子オブジェクトのポインタを返す */
     GameObject *GetChildByName(const std::string &searchName);
+
+    /**コライダーの中心のワールド座標を返す */
+    glm::vec3 GetWorldColliderCenter();
 };

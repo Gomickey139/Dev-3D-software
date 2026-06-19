@@ -2,6 +2,7 @@
 #include "input.h"
 #include "player.h"
 #include "enemy.h"
+#include "straightShotPool.h"
 #include <iostream>
 
 Application::Application()
@@ -57,6 +58,12 @@ bool Application::Initialize(int width, int height, const std::string &title)
     }
 
     glfwMakeContextCurrent(m_window);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cerr << "Failed to initialize GLAD" << std::endl;
+        return -1; // 起動失敗
+    }
+
     glfwSetKeyCallback(m_window, Input::KeyCallback);
 
     glEnable(GL_DEPTH_TEST);
@@ -68,7 +75,7 @@ bool Application::Initialize(int width, int height, const std::string &title)
     return true;
 }
 
-std::unique_ptr<GameObject> Application::CreateModel(const std::string &objPath, Shader *defaultShader, const std::map<std::string, Shader *> &specialShaders)
+std::unique_ptr<GameObject> Application::CreateModel(const std::string &objPath, Shader *defaultShader, const std::map<std::string, Shader *> &specialShaders, std::string name)
 {
     auto parts = ObjLoader::LoadMulti(objPath);
 
@@ -105,6 +112,9 @@ void Application::LoadAssets()
     m_shaders["thinking_eyebrows"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/eyebrows.frag");
     m_shaders["shot"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/weapon/shot.frag");
     m_shaders["fire"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/jet/fire.frag");
+    m_shaders["fade"] = std::make_unique<Shader>("../assets/shaders/postEffect/fade.vert", "../assets/shaders/postEffect/fade.frag");
+
+    InitFadeQuad();
 
     m_bgMesh = std::unique_ptr<Mesh>(ObjLoader::Load("../assets/models/background.obj"));
 
@@ -115,14 +125,17 @@ void Application::LoadAssets()
     m_meshes.push_back(std::unique_ptr<Mesh>(ObjLoader::Load("../assets/models/shot.obj")));
     Mesh *shotMeshPtr = m_meshes.back().get();
 
-    auto energyShot = std::make_unique<Weapon>(shotMeshPtr, m_shaders["shot"].get(), 0.15f, 100);
-    player->AddWeapon(std::move(energyShot));
-
+    auto playerShot = std::make_unique<StraightShotPool>("PlayerShot", 100, shotMeshPtr, m_shaders["shot"].get(), 0.15f, 70.0f, 2.0f, 0.1f);
+    m_shotPools.push_back(playerShot.get());
+    auto playerWeapon = std::make_unique<Weapon>(std::move(playerShot));
+    player->AddWeapon(std::move(playerWeapon));
+    m_playerRef = player.get();
     m_gameObjects.push_back(std::move(player));
 
     auto enemy = std::make_unique<Enemy>(nullptr, nullptr);
     auto enemyModel = CreateModel("../assets/models/thinking.obj", m_shaders["thinking_face"].get(), {{"Eyebrows", m_shaders["thinking_eyebrows"].get()}});
     enemy->AddChild(std::move(enemyModel));
+    m_enemyRef = enemy.get();
     m_gameObjects.push_back(std::move(enemy));
 }
 
@@ -157,6 +170,39 @@ void Application::CalculateViewport()
     }
 }
 
+void Application::InitFadeQuad()
+{
+    // 画面全体（-1.0 ～ 1.0）を覆う、ただの大きな四角形の頂点
+    float quadVertices[] = {
+        -1.0f, 1.0f,
+        -1.0f, -1.0f,
+        1.0f, -1.0f,
+
+        -1.0f, 1.0f,
+        1.0f, -1.0f,
+        1.0f, 1.0f};
+
+    glGenVertexArrays(1, &m_fadeVAO);
+    glGenBuffers(1, &m_fadeVBO);
+
+    glBindVertexArray(m_fadeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_fadeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+    // x, y の2つの成分だけを送る
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
+
+    glBindVertexArray(0);
+}
+
+void Application::CheckCollisions()
+{
+    m_colliderManager.CheckCollisions(m_gameObjects);
+
+    m_colliderManager.CheckSOCollisions(m_shotPools, m_gameObjects);
+}
+
 void Application::Run()
 {
 
@@ -175,6 +221,9 @@ void Application::Run()
 
         // 更新処理
         Update(m_deltaTime);
+
+        // 衝突判定
+        CheckCollisions();
 
         // 描画処理
         Render();
@@ -204,6 +253,48 @@ void Application::Update(float deltaTime)
     for (auto &obj : m_gameObjects)
     {
         obj->Update(deltaTime);
+    }
+
+    switch (m_gameState)
+    {
+    case GameState::Entrance:
+        // プレイヤーを強制的に「待機状態」にして操作不能にする
+        m_playerRef->SetState(PlayerState::Wait);
+
+        // 敵が戦闘フェーズに移行したかチェック
+        if (m_enemyRef->GetState() == EnemyState::Battle)
+        {
+            // 敵が降りきったら、ゲーム全体を戦闘モードに移行！
+            m_gameState = GameState::Battle;
+
+            // プレイヤーの操作ロックを解除（Normalに戻す）
+            m_playerRef->SetState(PlayerState::Normal);
+        }
+        break;
+
+    case GameState::Battle:
+        // 戦闘中... 敵が死んだかチェック
+        if (m_enemyRef->GetState() == EnemyState::Death)
+        {
+            // 敵が死んだら、クリア演出フェーズに移行！
+            m_gameState = GameState::Clear;
+
+            // プレイヤーの操作を再びロックする（操作不能にしてクリアポーズ等へ）
+            m_playerRef->SetState(PlayerState::Wait);
+        }
+        break;
+
+    case GameState::Clear:
+        m_clearFadeTimer += deltaTime;
+
+        m_backgroundFlash += m_deltaTime / 5.0f;
+        float v = glm::clamp(m_backgroundFlash, 0.0f, 1.0f);
+        if (m_bgMesh && m_shaders["background"])
+        {
+            m_shaders["background"]->use();
+            m_shaders["background"]->setFloat("uEndFlash", v);
+        }
+        break;
     }
 }
 
@@ -239,6 +330,31 @@ void Application::Render()
     for (auto &obj : m_gameObjects)
     {
         obj->Draw(view, projection);
+    }
+
+    if (m_gameState == GameState::Clear)
+    {
+        // 1. 半透明（アルファブレンド）を有効化
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // 2. 深度テストを無効化（奥にあっても絶対に最前面へ描画するため）
+        glDisable(GL_DEPTH_TEST);
+
+        // 3. タイマーから透明度を計算（例：2.0秒かけて 0.0 → 1.0 にする）
+        float alpha = glm::clamp(m_clearFadeTimer / 2.0f, 0.0f, 1.0f);
+
+        m_shaders["fade"]->use();
+        m_shaders["fade"]->setFloat("uAlpha", alpha);
+
+        // 四角形を描画！
+        glBindVertexArray(m_fadeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+
+        // 4. 設定を元に戻す
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_BLEND);
     }
 }
 

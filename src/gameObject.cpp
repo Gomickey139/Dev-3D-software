@@ -1,6 +1,3 @@
-#define GL_GLEXT_PROTOTYPES
-
-#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <fstream>
@@ -91,4 +88,9 @@ GameObject *GameObject::GetChildByName(const std::string &searchName)
     }
 
     return nullptr;
+}
+
+glm::vec3 GameObject::GetWorldColliderCenter()
+{
+    return transform.position + collider->offset;
 }
