@@ -36,7 +36,7 @@ void main() {
 
     FragColor = mix(vec4(subColor, 1.0), vec4(baseColor, 1.0), lighting);
 
-    vec4 flashColor = mix(FragColor, vec4(1.0), 0.5);
+    vec4 flashColor = mix(FragColor, vec4(1.0), 0.8);
 
     FragColor = mix(FragColor, flashColor, uHitFlash);
     FragColor = mix(FragColor, vec4(0.0), uDeathDark);

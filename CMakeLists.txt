@@ -21,8 +21,12 @@ add_executable(My3DApp
     src/shotPool.cpp 
     src/weapon.cpp
     src/collider.cpp
-    src/collisionMaganer.cpp
-    src/straightShotPool.cpp
+    src/collisionManager.cpp
+    src/sprite.cpp
+    src/uiManager.cpp
+    src/stb_image.cpp
+    src/texture.cpp
+    src/weapon_spreadShot.cpp
 )
 
 target_include_directories(My3DApp PRIVATE include)

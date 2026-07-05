@@ -2,11 +2,10 @@
 #include "input.h"
 #include "player.h"
 #include "enemy.h"
-#include "straightShotPool.h"
 #include <iostream>
 
 Application::Application()
-    : m_window(nullptr), m_windowWidth(960), m_windowHeight(540),
+    : m_window(nullptr), m_initialWidth(960), m_initialHeight(540), m_windowWidth(960), m_windowHeight(540),
       m_targetAspect(960.0f / 540.0f), m_viewX(0), m_viewY(0),
       m_viewWidth(960), m_viewHeight(540), m_deltaTime(0.0f), m_lastFrame(0.0f)
 {
@@ -19,6 +18,8 @@ Application::~Application()
 
 bool Application::Initialize(int width, int height, const std::string &title)
 {
+    m_initialWidth = width;
+    m_initialHeight = height;
     m_windowWidth = width;
     m_windowHeight = height;
     m_targetAspect = (float)width / (float)height;
@@ -27,7 +28,7 @@ bool Application::Initialize(int width, int height, const std::string &title)
     if (!glfwInit())
     {
         std::cerr << "GLFWの初期化に失敗しました" << std::endl;
-        return -1;
+        return false;
     }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -42,26 +43,23 @@ bool Application::Initialize(int width, int height, const std::string &title)
     {
         std::cerr << "ウィンドウの作成に失敗しました" << std::endl;
         glfwTerminate();
-        return -1;
+        return false;
     }
 
-    int monitorCount;
-    GLFWmonitor **monitors = glfwGetMonitors(&monitorCount);
-
-    std::cout << "モニターの個数：" << monitorCount << std::endl;
-
-    if (monitorCount > 1)
-    {
-        int xpos, ypos;
-        glfwGetMonitorPos(monitors[0], &xpos, &ypos);
-        glfwSetWindowPos(m_window, xpos + 100, ypos + 100);
-    }
+    // WSLgではプライマリモニターが判定できず、GLFWの初期位置が
+    // 別モニター側になることがあるため、仮想デスクトップ左上へ明示的に配置する。
+    glfwSetWindowPos(m_window, 100, 100);
+    glfwShowWindow(m_window);
+    glfwFocusWindow(m_window);
 
     glfwMakeContextCurrent(m_window);
+    // WSLgの合成速度に合わせてバッファを交換する。
+    // 無制限にSwapするとGPUだけを使い続け、画面転送が追いつかない場合がある。
+    glfwSwapInterval(1);
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         std::cerr << "Failed to initialize GLAD" << std::endl;
-        return -1; // 起動失敗
+        return false; // 起動失敗
     }
 
     glfwSetKeyCallback(m_window, Input::KeyCallback);
@@ -104,44 +102,69 @@ std::unique_ptr<GameObject> Application::CreateModel(const std::string &objPath,
 
 void Application::LoadAssets()
 {
+
     // シェーダーのコンパイルと確保
 
     m_shaders["default"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/default.frag");
     m_shaders["background"] = std::make_unique<Shader>("../assets/shaders/background/background.vert", "../assets/shaders/background/background.frag");
     m_shaders["thinking_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/face.frag");
     m_shaders["thinking_eyebrows"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/eyebrows.frag");
-    // m_shaders["angry_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/angry/face.frag");
-    // m_shaders["angry_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/angry/eyebrows.frag");
+    m_shaders["angry_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/angry/face.frag");
+    m_shaders["angry_eyebrows"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/angry/eyebrows.frag");
     m_shaders["shot"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/weapon/shot.frag");
     m_shaders["fire"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/jet/fire.frag");
     m_shaders["fade"] = std::make_unique<Shader>("../assets/shaders/postEffect/fade.vert", "../assets/shaders/postEffect/fade.frag");
+    m_shaders["ui_hp"] = std::make_unique<Shader>("../assets/shaders/ui/ui.vert", "../assets/shaders/ui/ui.frag");
+
+    //===================================================================
+
+    m_uiManager = std::make_unique<UIManager>(m_shaders["ui_hp"].get(), m_initialWidth, m_initialHeight);
+    // Ui用のテクスチャの読み込み
+    RegisterUITexture("player_hp_frame", "../assets/textures/PlayerHP.png", true);
+    RegisterUITexture("enemy_hp_frame", "../assets/textures/EnemyHP.png", true);
+    RegisterUITexture("reticle", "../assets/textures/Reticle.png", true);
+    RegisterUITexture("gradient", "../assets/textures/Gradient.png", true);
 
     InitFadeQuad();
 
     m_bgMesh = std::unique_ptr<Mesh>(ObjLoader::Load("../assets/models/background.obj"));
 
+    //===================================================================
     auto player = std::make_unique<Player>(nullptr, nullptr);
     auto playerModel = CreateModel("../assets/models/jet.obj", m_shaders["default"].get(), {{"Fire", m_shaders["fire"].get()}});
     player->AddChild(std::move(playerModel));
 
-    m_meshes.push_back(std::unique_ptr<Mesh>(ObjLoader::Load("../assets/models/shot.obj")));
-    Mesh *shotMeshPtr = m_meshes.back().get();
-
-    auto playerShot = std::make_unique<StraightShotPool>("PlayerShot", 100, shotMeshPtr, m_shaders["shot"].get(), 0.15f, 70.0f, 2.0f, 0.1f);
+    auto shotModel = CreateModel("../assets/models/shot.obj", m_shaders["shot"].get(), {}, "ShotModel");
+    auto playerShot = std::make_unique<ShotPool>(
+        "PlayerShot",
+        100,
+        std::move(shotModel),
+        2.0f,
+        0.1f);
     m_shotPools.push_back(playerShot.get());
-    auto playerWeapon = std::make_unique<Weapon>(std::move(playerShot));
+    auto playerWeapon = std::make_unique<Weapon>(std::move(playerShot), 0.15f, 70.0f);
     player->AddWeapon(std::move(playerWeapon));
     m_playerRef = player.get();
     m_gameObjects.push_back(std::move(player));
+    //===================================================================
 
     auto enemy = std::make_unique<Enemy>(nullptr, nullptr);
     auto enemyModel = CreateModel("../assets/models/thinking.obj", m_shaders["thinking_face"].get(), {{"Eyebrows", m_shaders["thinking_eyebrows"].get()}});
     enemy->AddChild(std::move(enemyModel));
     m_enemyRef = enemy.get();
 
-    m_meshes.push_back(std::unique_ptr<Mesh>(ObjLoader::Load("../assets/models/angry.obj")));
-    // Mesh *angryMeshPtr = m_meshes.back().get();
-    // auto enemyShot = std::make_unique<StraightShotPool>("EnemyShot", 100,angryMeshPtr, m_shaders[""])
+    auto angryModel = CreateModel("../assets/models/angry.obj", m_shaders["angry_face"].get(), {{"Eyebrows", m_shaders["angry_eyebrows"].get()}}, "AngryModel");
+    auto enemyShot = std::make_unique<ShotPool>(
+        "EnemyShot",
+        50,                    // 最大弾数
+        std::move(angryModel), // 弾のモデル
+        5.0f,                  // 弾の寿命
+        0.5f,                  // 弾の衝突判定用の半径
+        glm::vec3(1.0f),
+        ShotTeam::Enemy);
+    m_shotPools.push_back(enemyShot.get());
+    auto enemyWeapon = std::make_unique<Weapon_SpreadShot>(std::move(enemyShot), 0.1f, 30.0f);
+    enemy->AddWeapon(std::move(enemyWeapon));
     m_gameObjects.push_back(std::move(enemy));
 }
 
@@ -288,6 +311,14 @@ void Application::Update(float deltaTime)
             // プレイヤーの操作を再びロックする（操作不能にしてクリアポーズ等へ）
             m_playerRef->SetState(PlayerState::Wait);
         }
+        else if (m_playerRef->GetState() == PlayerState::Dead)
+        {
+            // プレイヤーが死んだら、ゲームオーバー演出フェーズに移行！
+            m_gameState = GameState::GameOver;
+
+            // プレイヤーの操作を再びロックする（操作不能にしてゲームオーバーポーズ等へ）
+            m_playerRef->SetState(PlayerState::Wait);
+        }
         break;
 
     case GameState::Clear:
@@ -301,6 +332,11 @@ void Application::Update(float deltaTime)
             m_shaders["background"]->setFloat("uEndFlash", v);
         }
         break;
+    }
+
+    if (m_uiManager)
+    {
+        m_uiManager->Update(deltaTime, m_playerRef, m_enemyRef);
     }
 }
 
@@ -362,12 +398,21 @@ void Application::Render()
         glEnable(GL_DEPTH_TEST);
         glDisable(GL_BLEND);
     }
+
+    // UI描画
+    if (m_uiManager)
+    {
+        m_uiManager->Draw(m_playerRef, m_enemyRef);
+    }
 }
 
 void Application::Shutdown()
 {
+    m_uiManager.reset();
+
     m_gameObjects.clear();
     m_meshes.clear();
+    m_textures.clear();
     m_bgMesh.reset();
 
     if (m_window)

@@ -1,12 +1,20 @@
 #pragma once
 
 #include "gameObject.h"
+#include "weapon_spreadShot.h"
 
 enum class EnemyState
 {
     Entrance,
     Battle,
     Death
+};
+
+enum class AttackPattern
+{
+    Wait,
+    StraightShot,
+    SpreadShot
 };
 
 class Enemy : public GameObject
@@ -20,12 +28,14 @@ private:
     glm::vec3 m_baseScale;
 
     float m_hitEffectTimer = 0.0f;
-    const float HIT_EFFECT_DURATION = 0.15f;
+    const float HIT_EFFECT_DURATION = 0.1f;
 
     float m_deathTimer = 0.0f;
 
     GameObject *m_hand = nullptr;
     GameObject *m_eyebrows = nullptr;
+
+    std::vector<std::unique_ptr<Weapon>> m_weapons;
 
     EnemyState m_currentState = EnemyState::Entrance;
 
@@ -35,11 +45,21 @@ private:
     float m_startRotX = -1.0f;
     float m_startRotY = 3.14f;
 
+    struct BattleData
+    {
+        AttackPattern m_currentAttackPattern = AttackPattern::SpreadShot;
+        float remainingTime = 1.5f;
+        float fireIntervalTimer = 0.0f; // 発射間隔のタイマー
+        int utilityCount = 0;
+    } m_battle;
+
     void UpdateEntrance();
     void UpdateBattle();
     void UpdateDeath();
 
     void ChangeState(EnemyState nextState);
+
+    void UpdateSpreadShot();
 
 public:
     Enemy(Mesh *m, Shader *s);
@@ -60,6 +80,10 @@ public:
 
     void ApplyHitFlash(GameObject *node, float flashAmount);
     void ApplyDeathDarkOut(GameObject *node, float darkAmount);
+
+    void AddWeapon(std::unique_ptr<Weapon> weapon);
+
+    float GetHP() const { return m_hp; }
 
     EnemyState GetState() { return m_currentState; }
 };

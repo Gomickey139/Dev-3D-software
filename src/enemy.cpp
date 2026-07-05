@@ -11,7 +11,7 @@ Enemy::Enemy(Mesh *m, Shader *s) : GameObject(m, s, "Enemy")
     transform.rotation.y = m_startRotY;
 
     m_basePosition = glm::vec3(0.0f, 0.0f, -40.0f);
-    m_hp = 1000.0f;
+    m_hp = 10000.0f;
 
     collider = std::make_unique<Collider>(10.0f);
 }
@@ -65,9 +65,31 @@ void Enemy::UpdateBattle()
 {
     Drift();
 
-    if (m_hand)
+    m_battle.remainingTime -= m_deltaTime;
+
+    switch (m_battle.m_currentAttackPattern)
     {
-        m_hand->transform.rotation.z += (acc++) * m_deltaTime * 0.05;
+    case AttackPattern::Wait:
+        if (m_battle.remainingTime > 3.0f)
+        {
+            m_battle.remainingTime = 0.0f;
+            m_battle.m_currentAttackPattern = AttackPattern::SpreadShot;
+        }
+        break;
+
+    case AttackPattern::StraightShot:
+        /* code */
+        break;
+    case AttackPattern::SpreadShot:
+        if (m_battle.remainingTime < 0.0f)
+        {
+            m_battle.remainingTime = 1.5f;
+            m_battle.m_currentAttackPattern = AttackPattern::SpreadShot;
+        }
+        UpdateSpreadShot();
+        break;
+    default:
+        break;
     }
 
     HitEffect();
@@ -96,6 +118,41 @@ void Enemy::ChangeState(EnemyState nextState)
     }
 }
 
+void Enemy::UpdateSpreadShot()
+{
+    if (m_weapons.empty())
+    {
+        return;
+    }
+
+    m_battle.fireIntervalTimer += m_deltaTime;
+    float t = glm::clamp(m_battle.fireIntervalTimer / 0.5f, 0.0f, 1.0f);
+    if (t == 1.0f)
+    {
+        if (m_battle.utilityCount >= 5)
+        {
+            m_battle.m_currentAttackPattern = AttackPattern::Wait;
+            m_battle.remainingTime = 1.5f;
+            m_battle.utilityCount = 0;
+            return;
+        }
+        glm::vec3 localPos = glm::vec3(0.0f, 0.0f, 1.2f);
+        glm::vec3 worldPos = glm::vec3(GetWorldMatrix() * glm::vec4(localPos, 1.0f));
+
+        glm::vec3 cameraPosition(0.0f, 0.0f, 10.0f);
+        glm::vec3 dir = glm::normalize(cameraPosition - worldPos);
+
+        m_weapons[0]->Fire(worldPos, dir, 7.0f, 20);
+
+        m_battle.fireIntervalTimer = 0.0f;
+        m_battle.utilityCount++;
+    }
+    else
+    {
+        return;
+    }
+}
+
 void Enemy::Update(float deltaTime)
 {
     m_deltaTime = deltaTime;
@@ -114,6 +171,10 @@ void Enemy::Update(float deltaTime)
     }
 
     GameObject::Update(deltaTime);
+    for (auto &w : m_weapons)
+    {
+        w->Update(m_deltaTime);
+    }
 }
 
 void Enemy::Draw(const glm::mat4 &view, const glm::mat4 &projection)
@@ -123,6 +184,11 @@ void Enemy::Draw(const glm::mat4 &view, const glm::mat4 &projection)
     ApplyHitFlash(this, flashAmount);
 
     GameObject::Draw(view, projection);
+
+    for (auto &w : m_weapons)
+    {
+        w->Draw(view, projection);
+    }
 }
 
 void Enemy::Drift()
@@ -218,4 +284,9 @@ void Enemy::ApplyDeathDarkOut(GameObject *node, float darkAmount)
     {
         ApplyDeathDarkOut(child.get(), darkAmount);
     }
+}
+
+void Enemy::AddWeapon(std::unique_ptr<Weapon> weapon)
+{
+    m_weapons.push_back(std::move(weapon));
 }

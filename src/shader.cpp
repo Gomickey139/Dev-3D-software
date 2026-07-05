@@ -75,6 +75,8 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath)
     // リンクエラーがないかチェック
     checkCompileErrors(ID, "PROGRAM");
 
+    std::cout << "シェーダー読み込み成功(" << vertexPath << ", " << fragmentPath << ")" << std::endl;
+
     glDeleteShader(vertex);
     glDeleteShader(fragment);
 }
@@ -87,6 +89,21 @@ void Shader::use()
 void Shader::setFloat(const std::string &name, float value) const
 {
     glUniform1f(glGetUniformLocation(ID, name.c_str()), value); // floatをシェーダーに渡す関数
+}
+
+void Shader::setInt(const std::string &name, int value) const
+{
+    glUniform1i(glGetUniformLocation(ID, name.c_str()), value); // intをシェーダーに渡す関数
+}
+
+void Shader::setBool(const std::string &name, bool value) const
+{
+    glUniform1i(glGetUniformLocation(ID, name.c_str()), value); // boolをシェーダーに渡す関数
+}
+
+void Shader::setVec3(const std::string &name, const glm::vec3 &value) const
+{
+    glUniform3f(glGetUniformLocation(ID, name.c_str()), value.x, value.y, value.z); // vec3をシェーダーに渡す関数
 }
 
 void Shader::setMat4(const std::string &name, const glm::mat4 &mat) const

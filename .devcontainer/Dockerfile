@@ -23,5 +23,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     libgl1 \
     libglx0 \
     libegl1 \
+    mingw-w64 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

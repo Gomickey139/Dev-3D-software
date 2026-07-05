@@ -30,6 +30,8 @@ private:
 
     float m_deltaTime;
 
+    float m_invincibleTimer = 0.0f;
+
     GameObject *m_fire = nullptr;
 
     std::vector<std::unique_ptr<Weapon>> m_weapons;
@@ -39,7 +41,7 @@ private:
     void UpdateWait();
     void UpdateNormal();
     void UpdateRolling();
-    void AfterTakingDamage();
+    void UpdateAfterTakingDamage();
     void UpdateDead();
 
     void ChangeState(PlayerState nextState);
@@ -64,5 +66,13 @@ public:
 
     void AddWeapon(std::unique_ptr<Weapon> weapon);
 
+    float GetHP() const { return m_hp; }
+
     void SetState(PlayerState newState) { ChangeState(newState); }
+
+    void Damage(float damage);
+
+    void Collision(std::string name) override;
+
+    PlayerState GetState() { return m_currentState; }
 };

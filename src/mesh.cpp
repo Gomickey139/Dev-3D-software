@@ -204,7 +204,7 @@ std::map<std::string, std::unique_ptr<Mesh>> ObjLoader::LoadMulti(const std::str
         result[currentPartName] = std::make_unique<Mesh>(currentVertices);
     }
 
-    std::cout << "モデル読み込み成功(" << path << ")" << std::endl;
+    std::cout << "モデル読み込み成功(" << path << ") 複数オブジェクト" << std::endl;
 
     return result;
 }

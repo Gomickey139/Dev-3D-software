@@ -7,9 +7,9 @@ Player::Player(Mesh *m, Shader *s) : GameObject(m, s, "Player")
     transform.scale = glm::vec3(0.1f);
     velocity.x = 0.0f;
     velocity.y = 0.0f;
-    m_hp = 100.0f;
+    m_hp = 10.0f;
 
-    collider = std::make_unique<Collider>(1.0f);
+    collider = std::make_unique<Collider>(0.6f);
 }
 
 void Player::Init()
@@ -53,22 +53,29 @@ void Player::MoveEvent()
 void Player::UpdateWeapons(bool canFire)
 {
 
-    bool isFiring = canFire && Input::GetKey(GLFW_KEY_P);
+    if (canFire && Input::GetKey(GLFW_KEY_P))
+    {
 
-    glm::vec3 localOffset1 = glm::vec3(-3.0f, -0.5f, 2.0f);
-    glm::vec3 localOffset2 = glm::vec3(3.0f, -0.5f, 2.0f);
+        glm::vec3 localOffset1 = glm::vec3(-3.0f, -0.5f, 2.0f);
+        glm::vec3 localOffset2 = glm::vec3(3.0f, -0.5f, 2.0f);
 
-    glm::vec3 dir = glm::vec3(0.0f, 0.0f, -1.0f);
+        glm::vec3 dir = glm::vec3(0.0f, 0.0f, -1.0f);
 
-    glm::mat4 worldMatrix = GetWorldMatrix();
+        glm::mat4 worldMatrix = GetWorldMatrix();
 
-    glm::vec3 spawnPos1 = glm::vec3(worldMatrix * glm::vec4(localOffset1, 1.0f));
-    glm::vec3 spawnPos2 = glm::vec3(worldMatrix * glm::vec4(localOffset2, 1.0f));
+        glm::vec3 spawnPos1 = glm::vec3(worldMatrix * glm::vec4(localOffset1, 1.0f));
+        glm::vec3 spawnPos2 = glm::vec3(worldMatrix * glm::vec4(localOffset2, 1.0f));
 
-    glm::vec3 forwardDir = glm::normalize(dir + glm::vec3(velocity, 0.0f) * 0.02f);
+        glm::vec3 forwardDir = glm::normalize(dir + glm::vec3(velocity, 0.0f) * 0.02f);
 
-    // 連射と更新を一括で処理
-    m_weapons[0]->UpdateAndFire(m_deltaTime, isFiring, {spawnPos1, spawnPos2}, forwardDir);
+        // 連射と更新を一括で処理
+        m_weapons[0]->Fire({spawnPos1, spawnPos2}, {forwardDir, forwardDir});
+    }
+
+    for (auto &w : m_weapons)
+    {
+        w->Update(m_deltaTime);
+    }
 }
 
 void Player::InputEvent()
@@ -110,7 +117,6 @@ void Player::UpdateNormal()
 
     if (Input::GetKeyDown(GLFW_KEY_SPACE))
     {
-        m_rollTimer = 0.0f;
         ChangeState(PlayerState::Rolling);
     }
 }
@@ -122,6 +128,11 @@ void Player::UpdateRolling()
 
     float rollDuration = 1.2f;
     m_rollTimer += m_deltaTime;
+
+    if (m_invincibleTimer < 1.0f)
+    {
+        m_invincibleTimer += m_deltaTime;
+    }
 
     // 1. ローリングの進行度（イージング）を計算
     float t = glm::clamp(m_rollTimer / rollDuration, 0.0f, 1.0f);
@@ -152,12 +163,42 @@ void Player::UpdateRolling()
     // 4. 終了判定
     if (m_rollTimer >= rollDuration)
     {
+        if (m_invincibleTimer < 1.0f)
+        {
+            ChangeState(PlayerState::AfterTakingDamage);
+        }
         ChangeState(PlayerState::Normal);
     }
 }
 
 void Player::UpdateDead()
 {
+}
+
+void Player::UpdateAfterTakingDamage()
+{
+
+    InputEvent();
+    limitVelocity();
+
+    transform.rotation.z = -velocity.x * 0.03f;
+    transform.rotation.x = velocity.y * 0.03f;
+
+    transform.position.x += velocity.x * m_deltaTime;
+    transform.position.y += velocity.y * m_deltaTime;
+
+    m_invincibleTimer += m_deltaTime;
+
+    float value = glm::clamp(m_invincibleTimer / 1.0f, 0.0f, 1.0f);
+
+    if (value >= 1.0f)
+    {
+        ChangeState(PlayerState::Normal);
+    }
+    else if (Input::GetKeyDown(GLFW_KEY_SPACE))
+    {
+        ChangeState(PlayerState::Rolling);
+    }
 }
 
 void Player::ChangeState(PlayerState nextState)
@@ -184,6 +225,10 @@ void Player::ChangeState(PlayerState nextState)
     else if (m_currentState == PlayerState::Dead)
     {
     }
+    else if (m_currentState == PlayerState::AfterTakingDamage)
+    {
+        m_invincibleTimer = 0.0f;
+    }
 }
 
 void Player::Update(float deltaTime)
@@ -203,6 +248,9 @@ void Player::Update(float deltaTime)
         break;
     case PlayerState::Dead:
         UpdateDead();
+        break;
+    case PlayerState::AfterTakingDamage:
+        UpdateAfterTakingDamage();
         break;
     }
 
@@ -230,4 +278,26 @@ void Player::Draw(const glm::mat4 &view, const glm::mat4 &projection)
 void Player::AddWeapon(std::unique_ptr<Weapon> weapon)
 {
     m_weapons.push_back(std::move(weapon));
+}
+
+void Player::Damage(float damage)
+{
+    m_hp -= damage;
+    if (m_hp <= 0.0f)
+    {
+        m_hp = 0.0f;
+        ChangeState(PlayerState::Dead);
+    }
+}
+
+void Player::Collision(std::string name)
+{
+    if (name == "EnemyShot" && m_currentState != PlayerState::Dead && m_currentState != PlayerState::AfterTakingDamage && m_currentState != PlayerState::Rolling)
+    {
+        Damage(10.0f);
+        if (m_currentState != PlayerState::Dead)
+        {
+            ChangeState(PlayerState::AfterTakingDamage);
+        }
+    }
 }
