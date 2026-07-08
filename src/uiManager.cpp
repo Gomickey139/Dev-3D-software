@@ -45,9 +45,21 @@ void UIManager::DrawTitle()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     DrawPressEnter();
+    DrawTitleText();
 
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+}
+
+void UIManager::DrawTitleText()
+{
+    unsigned int titleTextureID = m_textureIDs["title"];
+    if (titleTextureID != 0)
+    {
+        glm::vec2 pos = glm::vec2(288.9f, 243.1f);
+        glm::vec2 size = glm::vec2(863.1f);
+        m_uiSprite->Draw(m_uiShader, pos, size, glm::vec3(1.0f), 1.0f, m_uiProjection, titleTextureID, true);
+    }
 }
 
 void UIManager::DrawPressEnter()

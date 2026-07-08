@@ -21,6 +21,7 @@ private:
 
     // UI描画関数群
 
+    void DrawTitleText();
     void DrawPressEnter();
     void DrawPlayerHP(Player *player);
     void DrawEnemyHP(Enemy *enemy);

@@ -5,7 +5,7 @@ int main()
 {
     Application app;
 
-    if (!app.Initialize(1460, 810, "Emotion S改"))
+    if (!app.Initialize(1460, 810, "Face Shooting"))
     {
         return -1;
     }

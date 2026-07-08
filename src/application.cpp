@@ -128,6 +128,7 @@ void Application::LoadAssets()
     RegisterUITexture("gradient", "../assets/textures/Gradient.png", true);
     RegisterUITexture("press_enter", "../assets/textures/PRESSENTER.png", true);
     RegisterUITexture("text", "../assets/textures/Text.png", true);
+    RegisterUITexture("title", "../assets/textures/Title.png", true);
 
     InitFadeQuad();
 
