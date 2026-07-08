@@ -10,14 +10,13 @@ uniform float uDeathDark;
 vec3 lightDir = normalize(vec3(0.25, 0.25, 1.0));
 
 void main() {
-    // 1. 基本となる色（ここでは例としてグレー）
+    // 基本色
     vec3 baseColor = vec3(1.0, 0.25, 0.25);
 
-    // 2. ローカル座標の中心(0,0,0)からの距離を測る
+    // ローカル座標の中心(0,0,0)からの距離を測る
     float dist = length(localPos);
 
-    // 3. 距離に応じて色を変える処理
-    // 例：中心から距離 0.8 以内の部分を「赤色」にするWS
+    // 距離に応じて色を変える処理
     if(dist < 0.971) {
         baseColor = vec3(0.0);
     }

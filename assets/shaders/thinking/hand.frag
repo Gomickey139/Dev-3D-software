@@ -10,7 +10,6 @@ uniform float uDeathDark;
 vec3 lightDir = normalize(vec3(0.25, 0.25, 1.0));
 
 void main() {
-    // 1. 基本となる色（ここでは例としてグレー）
     vec3 baseColor = vec3(0.99, 1.0, 0.25);
 
     vec3 norm = normalize(Normal);
