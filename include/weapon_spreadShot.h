@@ -1,16 +1,11 @@
 #pragma once
-#include <random>
-
 #include "weapon.h"
 
 class Weapon_SpreadShot : public Weapon
 {
-private:
-    std::mt19937 m_randomEngine{std::random_device{}()};
-
 public:
-    Weapon_SpreadShot(std::unique_ptr<ShotPool> pool, float fireRate, float speed)
-        : Weapon(std::move(pool), fireRate, speed) {}
+    Weapon_SpreadShot(ShotPool &pool, float fireRate, float speed, float size = 0.5f)
+        : Weapon(pool, fireRate, speed, size) {}
 
     /**
      * @brief 指定した位置から指定した方向に、指定した半径で複数の弾を発射する

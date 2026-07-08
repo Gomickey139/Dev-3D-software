@@ -14,9 +14,11 @@
 #include "collisionManager.h"
 #include "uiManager.h"
 #include "texture.h"
+#include "shotManager.h"
 
 enum class GameState
 {
+    Title,
     Entrance,
     Battle,
     Clear,
@@ -39,6 +41,7 @@ private:
     // マネージャ
 
     ColliderManager m_colliderManager;
+    ShotManager m_shotManager;
     std::unique_ptr<UIManager> m_uiManager; // シェーダーの読み込みが必要なためスマートポインタで管理
 
     // ゲームの状態管理
@@ -58,9 +61,7 @@ private:
 
     std::vector<std::unique_ptr<GameObject>> m_gameObjects; // ゲームオブジェクトの管理用ベクター
 
-    std::vector<ShotPool *> m_shotPools; // 弾のプールの管理用ベクター
-
-    GameState m_gameState = GameState::Entrance; // ゲームの状態管理用変数
+    GameState m_gameState = GameState::Title; // ゲームの状態管理用変数
 
     Player *m_playerRef = nullptr; // プレイヤーのポインタ
     Enemy *m_enemyRef = nullptr;   // 敵のポインタ
@@ -99,6 +100,7 @@ private:
     // 画面フェードアウト用のメンバ　突貫実装につき直書き
 
     float m_clearFadeTimer = 0.0f;
+    float m_gameOverFadeTimer = 0.0f;
     unsigned int m_fadeVAO, m_fadeVBO;
 
     void InitFadeQuad();

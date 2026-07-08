@@ -109,12 +109,14 @@ void Application::LoadAssets()
     m_shaders["background"] = std::make_unique<Shader>("../assets/shaders/background/background.vert", "../assets/shaders/background/background.frag");
     m_shaders["thinking_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/face.frag");
     m_shaders["thinking_eyebrows"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/eyebrows.frag");
+    m_shaders["thinking_hand"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/hand.frag");
     m_shaders["angry_face"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/angry/face.frag");
     m_shaders["angry_eyebrows"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/angry/eyebrows.frag");
     m_shaders["shot"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/weapon/shot.frag");
     m_shaders["fire"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/jet/fire.frag");
     m_shaders["fade"] = std::make_unique<Shader>("../assets/shaders/postEffect/fade.vert", "../assets/shaders/postEffect/fade.frag");
     m_shaders["ui_hp"] = std::make_unique<Shader>("../assets/shaders/ui/ui.vert", "../assets/shaders/ui/ui.frag");
+    m_shaders["tears"] = std::make_unique<Shader>("../assets/shaders/default.vert", "../assets/shaders/thinking/tears.frag");
 
     //===================================================================
 
@@ -124,6 +126,8 @@ void Application::LoadAssets()
     RegisterUITexture("enemy_hp_frame", "../assets/textures/EnemyHP.png", true);
     RegisterUITexture("reticle", "../assets/textures/Reticle.png", true);
     RegisterUITexture("gradient", "../assets/textures/Gradient.png", true);
+    RegisterUITexture("press_enter", "../assets/textures/PRESSENTER.png", true);
+    RegisterUITexture("text", "../assets/textures/Text.png", true);
 
     InitFadeQuad();
 
@@ -137,34 +141,48 @@ void Application::LoadAssets()
     auto shotModel = CreateModel("../assets/models/shot.obj", m_shaders["shot"].get(), {}, "ShotModel");
     auto playerShot = std::make_unique<ShotPool>(
         "PlayerShot",
-        100,
+        200,
         std::move(shotModel),
         2.0f,
         0.1f);
-    m_shotPools.push_back(playerShot.get());
-    auto playerWeapon = std::make_unique<Weapon>(std::move(playerShot), 0.15f, 70.0f);
+    ShotPool &playerShotPool = m_shotManager.AddPool(std::move(playerShot));
+    auto playerWeapon = std::make_unique<Weapon>(playerShotPool, 0.15f, 70.0f);
     player->AddWeapon(std::move(playerWeapon));
     m_playerRef = player.get();
     m_gameObjects.push_back(std::move(player));
     //===================================================================
 
-    auto enemy = std::make_unique<Enemy>(nullptr, nullptr);
-    auto enemyModel = CreateModel("../assets/models/thinking.obj", m_shaders["thinking_face"].get(), {{"Eyebrows", m_shaders["thinking_eyebrows"].get()}});
+    auto enemy = std::make_unique<Enemy>(nullptr, nullptr, m_playerRef);
+    auto enemyModel = CreateModel("../assets/models/thinking.obj", m_shaders["thinking_face"].get(), {{"Eyebrows", m_shaders["thinking_eyebrows"].get()}, {"Hand", m_shaders["thinking_hand"].get()}}, "EnemyModel");
     enemy->AddChild(std::move(enemyModel));
     m_enemyRef = enemy.get();
 
     auto angryModel = CreateModel("../assets/models/angry.obj", m_shaders["angry_face"].get(), {{"Eyebrows", m_shaders["angry_eyebrows"].get()}}, "AngryModel");
     auto enemyShot = std::make_unique<ShotPool>(
         "EnemyShot",
-        50,                    // 最大弾数
+        500,                   // 最大弾数
         std::move(angryModel), // 弾のモデル
         5.0f,                  // 弾の寿命
         0.5f,                  // 弾の衝突判定用の半径
-        glm::vec3(1.0f),
         ShotTeam::Enemy);
-    m_shotPools.push_back(enemyShot.get());
-    auto enemyWeapon = std::make_unique<Weapon_SpreadShot>(std::move(enemyShot), 0.1f, 30.0f);
-    enemy->AddWeapon(std::move(enemyWeapon));
+    ShotPool &enemyShotPool = m_shotManager.AddPool(std::move(enemyShot));
+    auto SpreadShotWeapon = std::make_unique<Weapon_SpreadShot>(enemyShotPool, 0.1f, 30.0f);
+    auto StraightShotWeapon = std::make_unique<Weapon>(enemyShotPool, 0.1f, 30.0f);
+
+    auto tearsModel = CreateModel("../assets/models/tears.obj", m_shaders["tears"].get(), {}, "TearsModel");
+    auto tearsShot = std::make_unique<ShotPool>(
+        "TearsShot",
+        100,                   // 最大弾数
+        std::move(tearsModel), // 弾のモデル
+        5.0f,                  // 弾の寿命
+        1.0f,                  // 弾の衝突判定用の半径
+        ShotTeam::Enemy);
+    ShotPool &tearsShotPool = m_shotManager.AddPool(std::move(tearsShot));
+    auto DropTearsShotWeapon = std::make_unique<Weapon>(tearsShotPool, 0.4f, 5.0f, 1.0f);
+
+    enemy->AddWeapon(std::move(SpreadShotWeapon));
+    enemy->AddWeapon(std::move(StraightShotWeapon));
+    enemy->AddWeapon(std::move(DropTearsShotWeapon));
     m_gameObjects.push_back(std::move(enemy));
 }
 
@@ -227,9 +245,14 @@ void Application::InitFadeQuad()
 
 void Application::CheckCollisions()
 {
+    if (m_gameState != GameState::Battle)
+    {
+        return;
+    }
+
     m_colliderManager.CheckCollisions(m_gameObjects);
 
-    m_colliderManager.CheckSOCollisions(m_shotPools, m_gameObjects);
+    m_colliderManager.CheckSOCollisions(m_shotManager.GetPools(), m_gameObjects);
 }
 
 void Application::Run()
@@ -279,13 +302,30 @@ void Application::Init()
 
 void Application::Update(float deltaTime)
 {
+    if (m_gameState == GameState::Title)
+    {
+        if (!Input::GetKeyDown(GLFW_KEY_ENTER))
+        {
+            return;
+        }
+
+        // タイトルから既存の登場演出へ移り、演出完了後にBattleへ遷移する。
+        m_gameState = GameState::Entrance;
+        m_playerRef->SetState(PlayerState::Wait);
+    }
+
     for (auto &obj : m_gameObjects)
     {
         obj->Update(deltaTime);
     }
 
+    m_shotManager.Update(deltaTime);
+
     switch (m_gameState)
     {
+    case GameState::Title:
+        break;
+
     case GameState::Entrance:
         // プレイヤーを強制的に「待機状態」にして操作不能にする
         m_playerRef->SetState(PlayerState::Wait);
@@ -305,23 +345,21 @@ void Application::Update(float deltaTime)
         // 戦闘中... 敵が死んだかチェック
         if (m_enemyRef->GetState() == EnemyState::Death)
         {
-            // 敵が死んだら、クリア演出フェーズに移行！
+            // 敵が死んだら、クリア演出フェーズに移行
             m_gameState = GameState::Clear;
 
-            // プレイヤーの操作を再びロックする（操作不能にしてクリアポーズ等へ）
+            // プレイヤーの操作を再びロックする
             m_playerRef->SetState(PlayerState::Wait);
         }
         else if (m_playerRef->GetState() == PlayerState::Dead)
         {
-            // プレイヤーが死んだら、ゲームオーバー演出フェーズに移行！
+            // プレイヤーが死んだら、ゲームオーバー演出フェーズに移行
             m_gameState = GameState::GameOver;
-
-            // プレイヤーの操作を再びロックする（操作不能にしてゲームオーバーポーズ等へ）
-            m_playerRef->SetState(PlayerState::Wait);
         }
         break;
 
     case GameState::Clear:
+    {
         m_clearFadeTimer += deltaTime;
 
         m_backgroundFlash += m_deltaTime / 5.0f;
@@ -331,6 +369,11 @@ void Application::Update(float deltaTime)
             m_shaders["background"]->use();
             m_shaders["background"]->setFloat("uEndFlash", v);
         }
+        break;
+    }
+
+    case GameState::GameOver:
+        m_gameOverFadeTimer += deltaTime;
         break;
     }
 
@@ -346,13 +389,23 @@ void Application::Render()
 
     glViewport(m_viewX, m_viewY, m_viewWidth, m_viewHeight);
 
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), m_targetAspect, 0.1f, 1000.0f);
+    const float damageStrength = m_playerRef->GetDamageEffectStrength();
+
+    const float time = static_cast<float>(glfwGetTime());
+
+    glm::vec3 shakeOffset(std::sin(time * 83.0f), std::cos(time * 67.0f), 0.0f);
+
+    shakeOffset *= 0.5f * damageStrength;
+
+    const glm::vec3 baseCameraPosition(0.0f, 0.0f, 10.0f);
+    const glm::vec3 baseCameraTarget(0.0f);
+
     glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 10.0f),
-        glm::vec3(0.0f, 0.0f, 0.0f),
+        baseCameraPosition + shakeOffset,
+        baseCameraTarget + shakeOffset,
         glm::vec3(0.0f, 1.0f, 0.0f));
 
-    float time = (float)glfwGetTime();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), m_targetAspect, 0.1f, 1000.0f);
 
     if (m_bgMesh && m_shaders["background"])
     {
@@ -369,32 +422,37 @@ void Application::Render()
         glDepthMask(GL_TRUE);
     }
 
+    if (m_gameState == GameState::Title)
+    {
+        if (m_uiManager)
+        {
+            m_uiManager->DrawTitle();
+        }
+        return;
+    }
+
     for (auto &obj : m_gameObjects)
     {
         obj->Draw(view, projection);
     }
 
-    if (m_gameState == GameState::Clear)
+    m_shotManager.Draw(view, projection);
+
+    // ダメージを受けたときの赤いフラッシュエフェクト
+    if (damageStrength > 0.0f)
     {
-        // 1. 半透明（アルファブレンド）を有効化
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        // 2. 深度テストを無効化（奥にあっても絶対に最前面へ描画するため）
         glDisable(GL_DEPTH_TEST);
 
-        // 3. タイマーから透明度を計算（例：2.0秒かけて 0.0 → 1.0 にする）
-        float alpha = glm::clamp(m_clearFadeTimer / 5.0f, 0.0f, 1.0f);
-
         m_shaders["fade"]->use();
-        m_shaders["fade"]->setFloat("uAlpha", alpha);
+        m_shaders["fade"]->setFloat("uAlpha", damageStrength * 0.5f);
+        m_shaders["fade"]->setVec3("uColor", glm::vec3(1.0f, 0.0f, 0.0f));
 
-        // 四角形を描画！
         glBindVertexArray(m_fadeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
 
-        // 4. 設定を元に戻す
         glEnable(GL_DEPTH_TEST);
         glDisable(GL_BLEND);
     }
@@ -404,6 +462,42 @@ void Application::Render()
     {
         m_uiManager->Draw(m_playerRef, m_enemyRef);
     }
+
+    if (m_gameState == GameState::Clear || m_gameState == GameState::GameOver)
+    {
+        // 半透明（アルファブレンド）を有効化
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // 深度テストを無効化（奥にあっても絶対に最前面へ描画するため）
+        glDisable(GL_DEPTH_TEST);
+
+        if (m_gameState == GameState::Clear)
+        {
+            float alpha = glm::clamp(m_clearFadeTimer / 5.0f, 0.0f, 1.0f);
+
+            m_shaders["fade"]->use();
+            m_shaders["fade"]->setFloat("uAlpha", alpha);
+            m_shaders["fade"]->setVec3("uColor", glm::vec3(1.0f));
+        }
+        else if (m_gameState == GameState::GameOver)
+        {
+            float alpha = glm::clamp(m_gameOverFadeTimer / 3.0f, 0.0f, 1.0f);
+
+            m_shaders["fade"]->use();
+            m_shaders["fade"]->setFloat("uAlpha", alpha);
+            m_shaders["fade"]->setVec3("uColor", glm::vec3(0.0f));
+        }
+
+        // 四角形を描画
+        glBindVertexArray(m_fadeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+
+        // 設定を元に戻す
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_BLEND);
+    }
 }
 
 void Application::Shutdown()
@@ -411,6 +505,7 @@ void Application::Shutdown()
     m_uiManager.reset();
 
     m_gameObjects.clear();
+    m_shotManager.Clear();
     m_meshes.clear();
     m_textures.clear();
     m_bgMesh.reset();

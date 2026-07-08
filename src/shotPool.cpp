@@ -1,6 +1,6 @@
 #include "shotPool.h"
 
-ShotPool::ShotPool(std::string name, int maxShots, std::unique_ptr<GameObject> model, float lifeTime, float collisionRadius, glm::vec3 scale, ShotTeam team)
+ShotPool::ShotPool(std::string name, int maxShots, std::unique_ptr<GameObject> model, float lifeTime, float collisionRadius, ShotTeam team)
     : m_name(name), m_model(std::move(model)), m_shotLifeTime(lifeTime), m_collisionRadius(collisionRadius), m_team(team)
 {
     m_shots.resize(maxShots);

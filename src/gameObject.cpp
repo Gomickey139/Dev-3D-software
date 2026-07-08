@@ -6,7 +6,7 @@
 
 #include "gameObject.h"
 
-glm::mat4 Transform::GetModelMatrix() const
+glm::mat4 Transform::GetLocalMatrix() const
 {
     glm::mat4 m = glm::mat4(1.0f);
     m = glm::translate(m, position);
@@ -28,7 +28,7 @@ void GameObject::AddChild(std::unique_ptr<GameObject> child)
 
 glm::mat4 GameObject::GetWorldMatrix() const
 {
-    glm::mat4 localMat = transform.GetModelMatrix();
+    glm::mat4 localMat = transform.GetLocalMatrix();
     if (parent)
     {
         return parent->GetWorldMatrix() * localMat;
@@ -92,5 +92,5 @@ GameObject *GameObject::GetChildByName(const std::string &searchName)
 
 glm::vec3 GameObject::GetWorldColliderCenter()
 {
-    return transform.position + collider->offset;
+    return glm::vec3(GetWorldMatrix() * glm::vec4(collider->offset, 1.0f));
 }

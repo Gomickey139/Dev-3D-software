@@ -2,19 +2,15 @@
 
 #include <algorithm>
 
-Weapon::Weapon(std::unique_ptr<ShotPool> pool, float fireRate, float speed)
-    : m_fireRate(fireRate), m_shotSpeed(speed)
-{
-    m_pool = std::move(pool);
-}
+Weapon::Weapon(ShotPool &pool, float fireRate, float speed, float size)
+    : m_pool(pool), m_fireRate(fireRate), m_shotSpeed(speed), m_size(size) {}
 
 void Weapon::Update(float deltaTime)
 {
     m_fireTimer = std::max(0.0f, m_fireTimer - deltaTime);
-    m_pool->Update(deltaTime);
 }
 
-void Weapon::Fire(const std::vector<glm::vec3> &pos, const std::vector<glm::vec3> &dir)
+void Weapon::Fire(const std::vector<glm::vec3> &pos, const std::vector<glm::vec3> &dir, bool isRandomRotation)
 {
     std::vector<ShotSpawnParams> shots;
     shots.reserve(std::min(pos.size(), dir.size()));
@@ -24,6 +20,12 @@ void Weapon::Fire(const std::vector<glm::vec3> &pos, const std::vector<glm::vec3
         ShotSpawnParams params;
         params.velocity = glm::normalize(dir[i]) * m_shotSpeed;
         params.position = pos[i];
+        params.scale = glm::vec3(m_size);
+        if (isRandomRotation)
+        {
+            params.rotation = RandomUtil::Vec3(0.0f, glm::two_pi<float>());
+            params.angularVelocity = RandomUtil::UnitVector3() * RandomUtil::Float(1.0f, 3.0f);
+        }
         shots.push_back(params);
     }
 
@@ -39,14 +41,9 @@ bool Weapon::FirePreparedShots(const std::vector<ShotSpawnParams> &shots)
 
     for (const auto &shot : shots)
     {
-        m_pool->Spawn(shot);
+        m_pool.Spawn(shot);
     }
 
     m_fireTimer = m_fireRate;
     return true;
-}
-
-void Weapon::Draw(const glm::mat4 &view, const glm::mat4 &projection)
-{
-    m_pool->Draw(view, projection);
 }

@@ -1,14 +1,15 @@
 #include "enemy.h"
+#include "player.h"
 
 #include <glm/gtc/noise.hpp>
 #include <iostream>
 
-Enemy::Enemy(Mesh *m, Shader *s) : GameObject(m, s, "Enemy")
+Enemy::Enemy(Mesh *m, Shader *s, Player *playerRef) : GameObject(m, s, "Enemy"), m_playerRef(playerRef)
 {
     transform.position = glm::vec3(0.0f, m_startPosY, -40.0f);
     transform.scale = glm::vec3(10.0f);
 
-    transform.rotation.y = m_startRotY;
+    transform.rotation.y = glm::radians(m_startRotY);
 
     m_basePosition = glm::vec3(0.0f, 0.0f, -40.0f);
     m_hp = 10000.0f;
@@ -20,10 +21,18 @@ void Enemy::Init()
 {
     m_hand = GetChildByName("Hand");
     m_eyebrows = GetChildByName("Eyebrows");
+    m_face = GetChildByName("Face");
+    if (!m_hand || !m_eyebrows || !m_face)
+    {
+        std::cerr << "Error: Enemy model is missing required child objects (Hand, Eyebrows, Face)." << std::endl;
+    }
 
     m_baseScale = transform.scale;
 
     GameObject::Init();
+
+    m_hand->transform.position = glm::vec3(-0.20817f, -0.68922f, 0.93224f);
+    m_handBasePosition = m_hand->transform.position;
 }
 
 void Enemy::UpdateEntrance()
@@ -47,7 +56,7 @@ void Enemy::UpdateEntrance()
         m_entranceTimer += m_deltaTime;
         float t = glm::clamp(m_entranceTimer / 4.0f, 0.0f, 1.0f);
         float v = glm::smoothstep(0.2f, 0.8f, t);
-        transform.rotation.y = glm::mix(m_startRotY, 0.0f, v);
+        transform.rotation.y = glm::mix(glm::radians(m_startRotY), 0.0f, v);
 
         if (transform.rotation.y <= 0.0f)
         {
@@ -65,28 +74,22 @@ void Enemy::UpdateBattle()
 {
     Drift();
 
-    m_battle.remainingTime -= m_deltaTime;
-
     switch (m_battle.m_currentAttackPattern)
     {
     case AttackPattern::Wait:
-        if (m_battle.remainingTime > 3.0f)
-        {
-            m_battle.remainingTime = 0.0f;
-            m_battle.m_currentAttackPattern = AttackPattern::SpreadShot;
-        }
         break;
 
     case AttackPattern::StraightShot:
-        /* code */
+        UpdateStraightShot();
         break;
     case AttackPattern::SpreadShot:
-        if (m_battle.remainingTime < 0.0f)
-        {
-            m_battle.remainingTime = 1.5f;
-            m_battle.m_currentAttackPattern = AttackPattern::SpreadShot;
-        }
         UpdateSpreadShot();
+        break;
+    case AttackPattern::DropTears:
+        UpdateDropTears();
+        break;
+    case AttackPattern::PhaseChange:
+        UpdatePhaseChange();
         break;
     default:
         break;
@@ -114,7 +117,43 @@ void Enemy::ChangeState(EnemyState nextState)
 
     if (m_currentState == EnemyState::Death)
     {
-        m_hand->transform.rotation.z = 0.0f;
+        glm::vec3 initialize = glm::vec3(0.0f);
+        m_hand->transform.position = m_handBasePosition;
+        m_eyebrows->transform.position = initialize;
+        m_hand->transform.rotation = initialize;
+        m_eyebrows->transform.rotation = initialize;
+    }
+}
+
+void Enemy::ChangeAttackPattern(AttackPattern nextPattern)
+{
+    m_battle.m_currentAttackPattern = nextPattern;
+
+    if (m_battle.m_currentPhase == 0 && m_hp <= 8000.0f)
+    {
+        m_battle.m_currentAttackPattern = AttackPattern::PhaseChange;
+    }
+
+    m_battle.remainingTime = 1.5f;
+    m_battle.utilityTimer = 0.0f;
+    m_battle.utilityCount = 0;
+
+    switch (m_battle.m_currentAttackPattern)
+    {
+    case AttackPattern::Wait:
+        break;
+    case AttackPattern::StraightShot:
+        break;
+    case AttackPattern::SpreadShot:
+        m_battle.utilityCount = 10;
+        break;
+    case AttackPattern::DropTears:
+        m_battle.utilityCount = 0;
+        break;
+    case AttackPattern::PhaseChange:
+        std::cout << "Phase Change!" << std::endl;
+        m_battle.m_currentPhase++;
+        break;
     }
 }
 
@@ -125,17 +164,49 @@ void Enemy::UpdateSpreadShot()
         return;
     }
 
-    m_battle.fireIntervalTimer += m_deltaTime;
-    float t = glm::clamp(m_battle.fireIntervalTimer / 0.5f, 0.0f, 1.0f);
+    m_battle.utilityTimer += m_deltaTime;
+
+    float t = glm::clamp(m_battle.utilityTimer / 0.5f, 0.0f, 1.0f);
+
+    if (m_battle.utilityCount <= 0)
+    {
+        float t = glm::clamp(m_battle.utilityTimer / 1.0f, 0.0f, 1.0f);
+        float angle = glm::radians(glm::smoothstep(0.4f, 1.0f, t) * 720.0f);
+        glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        m_hand->transform.position = glm::vec3(rotationMatrix * glm::vec4(m_handBasePosition, 1.0f));
+
+        m_hand->transform.rotation.z = angle;
+        if (t == 1.0f)
+        {
+            switch (m_battle.m_currentPhase)
+            {
+            case 0:
+            {
+                ChangeAttackPattern(AttackPattern::StraightShot);
+                break;
+            }
+            case 1:
+            {
+                float rand = RandomUtil::Float();
+                if (rand < 0.5f)
+                {
+                    ChangeAttackPattern(AttackPattern::StraightShot);
+                }
+                else
+                {
+                    ChangeAttackPattern(AttackPattern::DropTears);
+                }
+                break;
+            }
+            }
+        }
+        return;
+    }
+
     if (t == 1.0f)
     {
-        if (m_battle.utilityCount >= 5)
-        {
-            m_battle.m_currentAttackPattern = AttackPattern::Wait;
-            m_battle.remainingTime = 1.5f;
-            m_battle.utilityCount = 0;
-            return;
-        }
+
         glm::vec3 localPos = glm::vec3(0.0f, 0.0f, 1.2f);
         glm::vec3 worldPos = glm::vec3(GetWorldMatrix() * glm::vec4(localPos, 1.0f));
 
@@ -144,12 +215,172 @@ void Enemy::UpdateSpreadShot()
 
         m_weapons[0]->Fire(worldPos, dir, 7.0f, 20);
 
-        m_battle.fireIntervalTimer = 0.0f;
-        m_battle.utilityCount++;
+        m_battle.utilityTimer = 0.0f;
+        m_battle.utilityCount--;
     }
-    else
+}
+
+void Enemy::UpdateStraightShot()
+{
+    m_battle.utilityTimer += m_deltaTime;
+    if (m_weapons.empty())
     {
         return;
+    }
+
+    switch (m_battle.utilityCount)
+    {
+
+    case 0:
+    {
+        float v = glm::smoothstep(0.4f, 1.0f, glm::clamp((m_battle.utilityTimer) / 1.0f, 0.0f, 1.0f));
+
+        glm::vec3 targetPosition = m_playerRef->GetWorldPosition();
+        glm::vec3 handPosition = m_hand->GetWorldPosition();
+        glm::vec3 dir = glm::normalize(targetPosition - handPosition);
+
+        glm::mat4 inverseParentMatrix = glm::inverse(GetWorldMatrix());
+        glm::vec3 localDir = glm::normalize(glm::vec3(inverseParentMatrix * glm::vec4(dir, 0.0f)));
+
+        float lemgth = glm::length(glm::vec2(localDir.x, localDir.z));
+        glm::vec3 angles(0.0f);
+        angles.x = -glm::atan(localDir.y, lemgth);
+        angles.y = glm::atan(localDir.x, localDir.z);
+        angles.z = 0.0f;
+        m_hand->transform.rotation = {glm::mix(0.0f, angles.z, v), glm::mix(0.0f, angles.y + glm::radians(-100.0f), v), glm::mix(0.0f, -angles.x + glm::radians(-20.0f), v)};
+        m_hand->transform.position = glm::vec3(m_handBasePosition.x - glm::mix(0.0f, 0.8f, v), m_handBasePosition.y + glm::mix(0.0f, 0.2f, v), m_handBasePosition.z);
+        glm::vec3 shotPos = glm::vec3(m_hand->GetWorldMatrix() * glm::vec4(0.5f, 0.3f, 0.0f, 1.0f));
+        glm::vec3 shotDir = glm::normalize(targetPosition - shotPos);
+
+        if (v == 1.0f)
+        {
+            m_weapons[1]->Fire({shotPos}, {shotDir}, true);
+        }
+
+        if (m_battle.utilityTimer > 4.0f)
+        {
+            m_battle.utilityCount++;
+            m_battle.utilityTimer = 0.0f;
+        }
+        break;
+    }
+    case 1:
+    {
+        float v = glm::smoothstep(0.4f, 1.0f, glm::clamp((m_battle.utilityTimer) / 1.0f, 0.0f, 1.0f));
+        glm::vec3 targetPosition = m_playerRef->GetWorldPosition();
+        glm::vec3 handPosition = m_hand->GetWorldPosition();
+        glm::vec3 dir = glm::normalize(targetPosition - handPosition);
+
+        glm::mat4 inverseParentMatrix = glm::inverse(GetWorldMatrix());
+        glm::vec3 localDir = glm::normalize(glm::vec3(inverseParentMatrix * glm::vec4(dir, 0.0f)));
+
+        float lemgth = glm::length(glm::vec2(localDir.x, localDir.z));
+        glm::vec3 angles(0.0f);
+        angles.x = -glm::atan(localDir.y, lemgth);
+        angles.y = glm::atan(localDir.x, localDir.z);
+        angles.z = 0.0f;
+        m_hand->transform.position = glm::vec3(m_handBasePosition.x - glm::mix(0.8f, 0.0f, v), m_handBasePosition.y + glm::mix(0.2f, 0.0f, v), m_handBasePosition.z);
+        m_hand->transform.rotation = {glm::mix(angles.z, 0.0f, v), glm::mix(angles.y + glm::radians(-100.0f), 0.0f, v), glm::mix(-angles.x + glm::radians(-20.0f), 0.0f, v)};
+
+        if (v == 1.0f)
+        {
+            m_battle.utilityCount++;
+            m_battle.utilityTimer = 0.0f;
+        }
+        break;
+    }
+    case 2:
+    {
+        float t = glm::clamp(m_battle.utilityTimer / 1.0f, 0.0f, 1.0f);
+        float angle = glm::radians(glm::smoothstep(0.4f, 1.0f, t) * 720.0f);
+        glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        m_hand->transform.position = glm::vec3(rotationMatrix * glm::vec4(m_handBasePosition, 1.0f));
+
+        m_hand->transform.rotation.z = angle;
+        if (t >= 1.0f)
+        {
+            switch (m_battle.m_currentPhase)
+            {
+            case 0:
+            {
+                ChangeAttackPattern(AttackPattern::SpreadShot);
+                break;
+            }
+            case 1:
+            {
+                float rand = RandomUtil::Float();
+                if (rand < 0.5f)
+                {
+                    ChangeAttackPattern(AttackPattern::SpreadShot);
+                }
+                else
+                {
+                    ChangeAttackPattern(AttackPattern::DropTears);
+                }
+                break;
+            }
+            }
+        }
+        break;
+    }
+    }
+}
+
+void Enemy::UpdateDropTears()
+{
+    m_battle.utilityTimer += m_deltaTime;
+    if (m_weapons.empty())
+    {
+        return;
+    }
+
+    float posX = RandomUtil::Float(-5.8f, 5.8f);
+    glm::vec3 spawnPos = glm::vec3(posX, 5.0f, 0.0f);
+    glm::vec3 dir = glm::vec3(0.0f, -1.0f, 0.0f);
+
+    m_weapons[2]->Fire({spawnPos}, {dir});
+
+    if (m_battle.utilityTimer >= 9.0f)
+    {
+        float t = glm::clamp((m_battle.utilityTimer - 9.0f) / 1.0f, 0.0f, 1.0f);
+        float angle = glm::radians(glm::smoothstep(0.4f, 1.0f, t) * 720.0f);
+        glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+
+        m_hand->transform.position = glm::vec3(rotationMatrix * glm::vec4(m_handBasePosition, 1.0f));
+
+        m_hand->transform.rotation.z = angle;
+    }
+
+    if (m_battle.utilityTimer >= 10.0f)
+    {
+        if (m_battle.m_currentPhase == 1)
+        {
+            float rand = RandomUtil::Float();
+            if (rand < 0.5f)
+            {
+                ChangeAttackPattern(AttackPattern::StraightShot);
+            }
+            else
+            {
+                ChangeAttackPattern(AttackPattern::SpreadShot);
+            }
+        }
+    }
+}
+
+void Enemy::UpdatePhaseChange()
+{
+    m_battle.utilityTimer += m_deltaTime;
+    float t = glm::clamp(m_battle.utilityTimer / 2.0f, 0.0f, 1.0f);
+    float v = t * t * t;
+
+    m_face->transform.rotation.z = glm::mix(0.0f, glm::radians(720.0f), v);
+    m_eyebrows->transform.rotation.z = glm::mix(0.0f, glm::radians(720.0f), v);
+
+    if (v == 1.0f)
+    {
+        ChangeAttackPattern(AttackPattern::DropTears);
     }
 }
 
@@ -184,11 +415,6 @@ void Enemy::Draw(const glm::mat4 &view, const glm::mat4 &projection)
     ApplyHitFlash(this, flashAmount);
 
     GameObject::Draw(view, projection);
-
-    for (auto &w : m_weapons)
-    {
-        w->Draw(view, projection);
-    }
 }
 
 void Enemy::Drift()
@@ -208,13 +434,14 @@ void Enemy::Drift()
 
     transform.position = m_basePosition + glm::vec3(noiseX, noiseY, 0.0f) * weight;
 
-    glm::vec3 dir = glm::normalize(-transform.position);
+    const glm::vec3 cameraPosition(0.0f, 0.0f, 10.0f);
+    glm::vec3 dir = glm::normalize(cameraPosition - transform.position);
 
     glm::vec3 angles(0.0f);
 
-    angles.x = -glm::asin(dir.y) * 0.5;
+    angles.x = -glm::asin(dir.y);
 
-    angles.y = glm::atan(dir.x, dir.z) * 0.5;
+    angles.y = glm::atan(dir.x, dir.z);
 
     angles.z = 0.0f;
 
@@ -238,7 +465,7 @@ void Enemy::Collision(std::string name)
     {
         // std::cout << "衝突" << std::endl;
         m_hitEffectTimer = HIT_EFFECT_DURATION;
-        Damage(10.0f);
+        Damage(12.0f);
     }
 }
 

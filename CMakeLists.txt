@@ -19,6 +19,8 @@ add_executable(My3DApp
     src/enemy.cpp 
     src/application.cpp 
     src/shotPool.cpp 
+    src/shotManager.cpp
+    src/randomUtil.cpp
     src/weapon.cpp
     src/collider.cpp
     src/collisionManager.cpp

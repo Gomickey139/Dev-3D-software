@@ -16,6 +16,8 @@ enum class PlayerState
 class Player : public GameObject
 {
 private:
+    float m_deltaTime;
+
     glm::vec2 velocity{0.0f, 0.0f};
     float acceleration = 120.0f;
     float limitSpeed = 15.0f;
@@ -28,7 +30,8 @@ private:
     glm::vec3 m_currentRotate;
     float m_hp = 0;
 
-    float m_deltaTime;
+    float m_damageEffectTimer = 0.0f;          // ダメージエフェクトのタイマー
+    const float DAMAGE_EFFECT_DURATION = 0.1f; // ダメージエフェクトの長さ（秒）
 
     float m_invincibleTimer = 0.0f;
 
@@ -75,4 +78,6 @@ public:
     void Collision(std::string name) override;
 
     PlayerState GetState() { return m_currentState; }
+
+    float GetDamageEffectStrength() const;
 };

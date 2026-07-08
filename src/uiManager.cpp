@@ -32,9 +32,33 @@ void UIManager::Draw(Player *player, Enemy *enemy)
     if (enemy)
         DrawEnemyHP(enemy);
 
+    DrawText();
     // 状態を戻す
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+}
+
+void UIManager::DrawTitle()
+{
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    DrawPressEnter();
+
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+}
+
+void UIManager::DrawPressEnter()
+{
+    unsigned int pressEnterTextureID = m_textureIDs["press_enter"];
+    if (pressEnterTextureID != 0)
+    {
+        glm::vec2 pos = glm::vec2(452.8f, 453.3f);
+        glm::vec2 size = glm::vec2(535.2f);
+        m_uiSprite->Draw(m_uiShader, pos, size, glm::vec3(1.0f), 1.0f, m_uiProjection, pressEnterTextureID, true);
+    }
 }
 
 void UIManager::DrawPlayerHP(Player *player)
@@ -95,5 +119,16 @@ void UIManager::DrawEnemyHP(Enemy *enemy)
         glm::vec2 framePos = glm::vec2(927.9f, 701.7f);
         glm::vec2 frameSize = glm::vec2(494.2f);
         m_uiSprite->Draw(m_uiShader, framePos, frameSize, glm::vec3(1.0f), 1.0f, m_uiProjection, frameTextureID, true);
+    }
+}
+
+void UIManager::DrawText()
+{
+    unsigned int textTextureID = m_textureIDs["text"];
+    if (textTextureID != 0)
+    {
+        glm::vec2 pos = glm::vec2(5.0f, 5.0f);
+        glm::vec2 size = glm::vec2(238.0f);
+        m_uiSprite->Draw(m_uiShader, pos, size, glm::vec3(1.0f), 1.0f, m_uiProjection, textTextureID, true);
     }
 }

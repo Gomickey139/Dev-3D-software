@@ -22,44 +22,31 @@ void Weapon_SpreadShot::Fire(const glm::vec3 &pos, const glm::vec3 &dir, float r
     const glm::vec3 axisX = glm::normalize(glm::cross(reference, forward));
     const glm::vec3 axisY = glm::cross(forward, axisX);
 
-    std::uniform_real_distribution<float> unitDistribution(0.0f, 1.0f);
-    std::uniform_real_distribution<float> signedUnitDistribution(-1.0f, 1.0f);
-    std::uniform_real_distribution<float> angularSpeedDistribution(1.0f, 3.0f);
     std::vector<ShotSpawnParams> shots;
     shots.reserve(static_cast<std::size_t>(count));
 
     for (int i = 0; i < count; ++i)
     {
-        const float distance = radius * std::sqrt(unitDistribution(m_randomEngine));
-        const float angle = glm::two_pi<float>() * unitDistribution(m_randomEngine);
+        const float distance = radius * std::sqrt(RandomUtil::Float());
+        const float angle = RandomUtil::Float(0.0f, glm::two_pi<float>());
         const glm::vec3 offset =
             axisX * (distance * std::cos(angle)) +
             axisY * (distance * std::sin(angle));
 
         // 初期角度と回転軸を弾ごとに独立して決める。
-        const glm::vec3 initialRotation(
-            glm::two_pi<float>() * unitDistribution(m_randomEngine),
-            glm::two_pi<float>() * unitDistribution(m_randomEngine),
-            glm::two_pi<float>() * unitDistribution(m_randomEngine));
-
-        const float axisZ = signedUnitDistribution(m_randomEngine);
-        const float axisAngle = glm::two_pi<float>() * unitDistribution(m_randomEngine);
-        const float axisRadius = std::sqrt(1.0f - axisZ * axisZ);
-        const glm::vec3 rotationAxis(
-            axisRadius * std::cos(axisAngle),
-            axisRadius * std::sin(axisAngle),
-            axisZ);
+        const glm::vec3 initialRotation = RandomUtil::Vec3(0.0f, glm::two_pi<float>());
+        const glm::vec3 rotationAxis = RandomUtil::UnitVector3();
 
         ShotSpawnParams params;
         params.position = pos + offset;
         params.velocity = forward * GetShotSpeed();
         params.rotation = initialRotation;
-        params.angularVelocity =
-            rotationAxis * angularSpeedDistribution(m_randomEngine);
+        params.scale = glm::vec3(0.3f);
+        params.angularVelocity = rotationAxis * RandomUtil::Float(1.0f, 3.0f);
         shots.push_back(params);
     }
 
-    // 発射間隔とShotPoolへの登録は基底Weaponに任せる。
+    // 発射間隔とShotPoolへの登録は基底Weaponに任せる
     FirePreparedShots(shots);
 }
 

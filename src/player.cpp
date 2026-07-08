@@ -7,9 +7,9 @@ Player::Player(Mesh *m, Shader *s) : GameObject(m, s, "Player")
     transform.scale = glm::vec3(0.1f);
     velocity.x = 0.0f;
     velocity.y = 0.0f;
-    m_hp = 10.0f;
+    m_hp = 100.0f;
 
-    collider = std::make_unique<Collider>(0.6f);
+    collider = std::make_unique<Collider>(0.5f);
 }
 
 void Player::Init()
@@ -205,35 +205,37 @@ void Player::ChangeState(PlayerState nextState)
 {
     m_currentState = nextState;
 
-    if (m_currentState == PlayerState::Wait)
+    switch (m_currentState)
     {
+    case PlayerState::Wait:
         m_rotateRisetTimer = 0.0f;
         m_currentRotate = transform.rotation;
-    }
-    else if (m_currentState == PlayerState::Rolling)
-    {
+        break;
 
+    case PlayerState::Rolling:
         m_rollTimer = 0.0f;
         m_rollAngle = 0.0f;
         acceleration = 360.0f;
-    }
-    else if (m_currentState == PlayerState::Normal)
-    {
+        break;
+
+    case PlayerState::Normal:
         m_rollAngle = 0.0f;
         acceleration = 120.0f;
-    }
-    else if (m_currentState == PlayerState::Dead)
-    {
-    }
-    else if (m_currentState == PlayerState::AfterTakingDamage)
-    {
+        break;
+
+    case PlayerState::Dead:
+        break;
+
+    case PlayerState::AfterTakingDamage:
         m_invincibleTimer = 0.0f;
+        break;
     }
 }
 
 void Player::Update(float deltaTime)
 {
     m_deltaTime = deltaTime;
+    m_damageEffectTimer = std::max(0.0f, m_damageEffectTimer - deltaTime);
 
     switch (m_currentState)
     {
@@ -267,12 +269,6 @@ void Player::Update(float deltaTime)
 void Player::Draw(const glm::mat4 &view, const glm::mat4 &projection)
 {
     GameObject::Draw(view, projection);
-
-    // すべての武器（の弾）を描画する
-    for (auto &w : m_weapons)
-    {
-        w->Draw(view, projection);
-    }
 }
 
 void Player::AddWeapon(std::unique_ptr<Weapon> weapon)
@@ -283,6 +279,7 @@ void Player::AddWeapon(std::unique_ptr<Weapon> weapon)
 void Player::Damage(float damage)
 {
     m_hp -= damage;
+    m_damageEffectTimer = DAMAGE_EFFECT_DURATION;
     if (m_hp <= 0.0f)
     {
         m_hp = 0.0f;
@@ -292,12 +289,33 @@ void Player::Damage(float damage)
 
 void Player::Collision(std::string name)
 {
-    if (name == "EnemyShot" && m_currentState != PlayerState::Dead && m_currentState != PlayerState::AfterTakingDamage && m_currentState != PlayerState::Rolling)
+    if (m_currentState == PlayerState::Dead ||
+        m_currentState == PlayerState::AfterTakingDamage ||
+        m_currentState == PlayerState::Rolling)
+    {
+        return;
+    }
+
+    bool damaged = false;
+
+    if (name == "EnemyShot")
     {
         Damage(10.0f);
-        if (m_currentState != PlayerState::Dead)
-        {
-            ChangeState(PlayerState::AfterTakingDamage);
-        }
+        damaged = true;
     }
+    else if (name == "TearsShot")
+    {
+        Damage(15.0f);
+        damaged = true;
+    }
+
+    if (damaged && m_currentState != PlayerState::Dead)
+    {
+        ChangeState(PlayerState::AfterTakingDamage);
+    }
+}
+
+float Player::GetDamageEffectStrength() const
+{
+    return glm::clamp(m_damageEffectTimer / DAMAGE_EFFECT_DURATION, 0.0f, 1.0f);
 }

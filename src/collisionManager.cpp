@@ -18,7 +18,7 @@ void ColliderManager::CheckCollisions(const std::vector<std::unique_ptr<GameObje
                 continue;
             }
 
-            float dist = glm::distance(obj1->transform.position, obj2->transform.position);
+            float dist = glm::distance(obj1->GetWorldColliderCenter(), obj2->GetWorldColliderCenter());
             float minDist = obj1->collider->radius + obj2->collider->radius;
 
             // std::cout << "(" << obj1->transform.position.x << "," << obj1->transform.position.y << "," << obj1->transform.position.z << ")と(" << obj2->transform.position.x << "," << obj2->transform.position.y << "," << obj2->transform.position.z << ")" << std::endl;
@@ -32,9 +32,9 @@ void ColliderManager::CheckCollisions(const std::vector<std::unique_ptr<GameObje
     }
 }
 
-void ColliderManager::CheckSOCollisions(const std::vector<ShotPool *> &allShotPools, const std::vector<std::unique_ptr<GameObject>> &gameObjects)
+void ColliderManager::CheckSOCollisions(const std::vector<std::unique_ptr<ShotPool>> &allShotPools, const std::vector<std::unique_ptr<GameObject>> &gameObjects)
 {
-    for (ShotPool *pool : allShotPools)
+    for (const auto &pool : allShotPools)
     {
         float currentColligionRadius = pool->GetCollisionRadius();
 

@@ -57,10 +57,9 @@ public:
      * @param model 弾のモデル
      * @param lifeTime 弾の寿命（秒）
      * @param collisionRadius 弾の衝突判定用の半径
-     * @param scale 弾のスケール
      * @param team 弾の所属チーム（プレイヤー or 敵）
      */
-    ShotPool(std::string name, int maxBullets, std::unique_ptr<GameObject> model, float lifeTime, float collisionRadius, glm::vec3 scale = glm::vec3(0.5f), ShotTeam team = ShotTeam::Player);
+    ShotPool(std::string name, int maxBullets, std::unique_ptr<GameObject> model, float lifeTime, float collisionRadius, ShotTeam team = ShotTeam::Player);
 
     virtual ~ShotPool() = default;
 
